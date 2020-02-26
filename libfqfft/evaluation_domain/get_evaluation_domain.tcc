@@ -24,6 +24,7 @@
 #include <libfqfft/evaluation_domain/domains/extended_radix2_domain.hpp>
 #include <libfqfft/evaluation_domain/domains/geometric_sequence_domain.hpp>
 #include <libfqfft/evaluation_domain/domains/step_radix2_domain.hpp>
+#include <libfqfft/evaluation_domain/domains/recursive_domain.hpp>
 #include <libfqfft/evaluation_domain/evaluation_domain.hpp>
 #include <libfqfft/tools/exceptions.hpp>
 
@@ -38,7 +39,8 @@ std::shared_ptr<evaluation_domain<FieldT> > get_evaluation_domain(const size_t m
     const size_t small = min_size - big;
     const size_t rounded_small = (1ul<<libff::log2(small));
 
-    try { result.reset(new basic_radix2_domain<FieldT>(min_size)); }
+    try { result.reset(new recursive_domain<FieldT>(min_size)); }
+    catch(...) { try { result.reset(new basic_radix2_domain<FieldT>(min_size)); }
     catch(...) { try { result.reset(new extended_radix2_domain<FieldT>(min_size)); }
     catch(...) { try { result.reset(new step_radix2_domain<FieldT>(min_size)); }
     catch(...) { try { result.reset(new basic_radix2_domain<FieldT>(big + rounded_small)); }
@@ -46,7 +48,7 @@ std::shared_ptr<evaluation_domain<FieldT> > get_evaluation_domain(const size_t m
     catch(...) { try { result.reset(new step_radix2_domain<FieldT>(big + rounded_small)); }
     catch(...) { try { result.reset(new geometric_sequence_domain<FieldT>(min_size)); }
     catch(...) { try { result.reset(new arithmetic_sequence_domain<FieldT>(min_size)); }
-    catch(...) { throw DomainSizeException("get_evaluation_domain: no matching domain"); }}}}}}}}
+    catch(...) { throw DomainSizeException("get_evaluation_domain: no matching domain"); }}}}}}}}}
 
     return result;
 }
