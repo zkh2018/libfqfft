@@ -317,6 +317,7 @@ void _recursive_FFT(fft_data<FieldT>& data, std::vector<FieldT>& in, bool invers
     {
         _recursive_FFT_inner<FieldT, false>(in, data.scratch, inverse? data.iTwiddles : data.fTwiddles, data.stages, 0, 0, 1, 0, num_threads);
     }
+    assert(in.size() == data.scratch.size());
     std::swap(in, data.scratch);
 }
 

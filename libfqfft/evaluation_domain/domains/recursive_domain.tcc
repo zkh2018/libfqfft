@@ -43,7 +43,7 @@ recursive_domain<FieldT>::recursive_domain(const size_t m, const libsnark::Confi
 
     auto ranges = libsnark::get_cpu_ranges(0, m);
 
-    data.scratch.resize(m);
+    data.scratch.resize(m+1);
 
     // Generate stage twiddles
     for (unsigned int inv = 0; inv < 2; inv++)
