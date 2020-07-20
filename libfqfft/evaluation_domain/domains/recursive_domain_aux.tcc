@@ -238,14 +238,18 @@ void _recursive_FFT_inner(
         }
         else
         {
+#ifdef MULTICORE
             unsigned int num_threads_recursive = (num_threads >= radix) ? radix : num_threads;
             #pragma omp parallel for num_threads(num_threads_recursive)
+#endif
             for (unsigned int i = 0; i < radix; i++)
             {
                 unsigned int num_threads_in_recursion = (num_threads < radix) ? 1 : (num_threads + i) / radix;
                 if (smt)
                 {
+#ifdef MULTICORE
                     omp_set_num_threads(num_threads_in_recursion * 2);
+#endif
                 }
                 // std::cout << "Start thread on " << level << ": " << num_threads_in_recursion << std::endl;
                 _recursive_FFT_inner<FieldT, smt>(in, out, twiddles, stages, in_offset + i*stride, out_offset + i*stage_length, stride*radix, level+1, num_threads_in_recursion);
