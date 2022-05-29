@@ -36,23 +36,23 @@ recursive_domain<FieldT>::recursive_domain(const size_t m, const libsnark::Confi
     try { omega = libff::get_root_of_unity<FieldT>(m); }
     catch (const std::invalid_argument& e) { throw DomainSizeException(e.what()); }
 
-    data.m = m;
-    data.smt = config.smt;
+    this->data.m = m;
+    this->data.smt = config.smt;
 
-    data.stages = get_stages(m, config.radixes);
+    this->data.stages = get_stages(m, config.radixes);
 
     auto ranges = libsnark::get_cpu_ranges(0, m);
 
-    data.scratch.resize(m+1);
+    this->data.scratch.resize(m+1);
 
     // Generate stage twiddles
     for (unsigned int inv = 0; inv < 2; inv++)
     {
         bool inverse = (inv == 0);
         const FieldT o = inverse ? omega.inverse() : omega;
-        std::vector<std::vector<FieldT>>& stageTwiddles = inverse ? data.iTwiddles : data.fTwiddles;
+        std::vector<std::vector<FieldT>>& stageTwiddles = inverse ? this->data.iTwiddles : this->data.fTwiddles;
 
-        std::vector<FieldT>& twiddles = data.scratch;
+        std::vector<FieldT>& twiddles = this->data.scratch;
 
         // Twiddles
         {
@@ -72,12 +72,12 @@ recursive_domain<FieldT>::recursive_domain(const size_t m, const libsnark::Confi
         }
 
         // Re-order twiddles for cache friendliness
-        unsigned int n = data.stages.size();
+        unsigned int n = this->data.stages.size();
         stageTwiddles.resize(n);
         for (unsigned int l = 0; l < n; l++)
         {
-            const unsigned int radix = data.stages[l].radix;
-            const unsigned int stage_length = data.stages[l].length;
+            const unsigned int radix = this->data.stages[l].radix;
+            const unsigned int stage_length = this->data.stages[l].length;
 
             unsigned int numTwiddles = stage_length * (radix - 1);
             stageTwiddles[l].resize(numTwiddles + 1);
@@ -102,13 +102,24 @@ recursive_domain<FieldT>::recursive_domain(const size_t m, const libsnark::Confi
 template<typename FieldT>
 void recursive_domain<FieldT>::FFT(std::vector<FieldT> &a)
 {
-    _recursive_FFT(data, a, false);
+    std::vector<std::vector<Info>> infos;
+    _recursive_FFT(this->data, a, false, infos);
 }
+
+template<typename FieldT>
+void recursive_domain<FieldT>::fft_internal(std::vector<FieldT> &a, std::vector<std::vector<Info>>& infos)
+{
+    iFFT_internal(a, infos, true);
+}
+
 
 template<typename FieldT>
 void recursive_domain<FieldT>::iFFT(std::vector<FieldT> &a)
 {
-    iFFT_internal(a);
+    double t0 = omp_get_wtime();
+    std::vector<std::vector<Info>> infos;
+    iFFT_internal(a, infos);
+    double t1 = omp_get_wtime();
 
     const FieldT sconst = FieldT(this->m).inverse();
 #ifdef MULTICORE
@@ -117,26 +128,30 @@ void recursive_domain<FieldT>::iFFT(std::vector<FieldT> &a)
     for (size_t i = 0; i < this->m; ++i)
     {
         a[i] *= sconst;
+        //a[i].gpu_mul(sconst);
     }
+    double t2 = omp_get_wtime();
+    printf("internal time = %f, elementwise mul time = %f\n", t1-t0, t2-t1); 
 }
 
 template<typename FieldT>
-void recursive_domain<FieldT>::iFFT_internal(std::vector<FieldT> &a)
+void recursive_domain<FieldT>::iFFT_internal(std::vector<FieldT> &a, std::vector<std::vector<Info>>& infos, bool use_gpu)
 {
-    _recursive_FFT(data, a, true);
+    _recursive_FFT(this->data, a, true, infos, use_gpu);
 }
 
 template<typename FieldT>
 void recursive_domain<FieldT>::cosetFFT(std::vector<FieldT> &a, const FieldT &g)
 {
     _multiply_by_coset_and_constant(this->m, a, g);
-    FFT(a);
+    //FFT(a);
 }
 
 template<typename FieldT>
 void recursive_domain<FieldT>::icosetFFT(std::vector<FieldT> &a, const FieldT &g)
 {
-    iFFT_internal(a);
+    //std::vector<std::vector<Info>> infos;
+    //iFFT_internal(a, infos);
     const FieldT sconst = FieldT(this->m).inverse();
     _multiply_by_coset_and_constant(this->m, a, g.inverse(), sconst);
 }

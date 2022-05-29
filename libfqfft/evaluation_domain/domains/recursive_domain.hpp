@@ -32,6 +32,7 @@ public:
 
     void FFT(std::vector<FieldT> &a);
     void iFFT(std::vector<FieldT> &a);
+    void fft_internal(std::vector<FieldT> &a, std::vector<std::vector<Info>>& infos);
     void cosetFFT(std::vector<FieldT> &a, const FieldT &g);
     void icosetFFT(std::vector<FieldT> &a, const FieldT &g);
     std::vector<FieldT> evaluate_all_lagrange_polynomials(const FieldT &t);
@@ -42,9 +43,8 @@ public:
 
 public:
 
-    void iFFT_internal(std::vector<FieldT> &a);
+    void iFFT_internal(std::vector<FieldT> &a, std::vector<std::vector<Info>>& infos, bool use_gpu=false);
 
-    fft_data<FieldT> data;
 };
 
 } // libfqfft

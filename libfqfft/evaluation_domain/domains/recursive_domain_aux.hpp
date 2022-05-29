@@ -19,32 +19,12 @@
 
 namespace libfqfft {
 
-struct fft_stage
-{
-    fft_stage(unsigned int _radix, unsigned int _length) : radix(_radix), length(_length) {}
-    unsigned int radix;
-    unsigned int length;
-};
-
-template<typename FieldT>
-struct fft_data
-{
-    unsigned int m;
-    bool smt;
-
-    std::vector<fft_stage> stages;
-
-    std::vector<std::vector<FieldT>> fTwiddles;
-    std::vector<std::vector<FieldT>> iTwiddles;
-
-    std::vector<FieldT> scratch;
-};
 
 /**
  * Compute the FFT of the vector a over the set S={omega^{0},...,omega^{m-1}}.
  */
 template<typename FieldT>
-void _recursive_FFT(fft_data<FieldT>& data, std::vector<FieldT>& in, bool inverse);
+void _recursive_FFT(fft_data<FieldT>& data, std::vector<FieldT>& in, bool inverse, std::vector<std::vector<Info>>& infos, bool use_gpu=false);
 
 /**
  * Translate the vector a to a coset defined by g + extra constant multiplication.

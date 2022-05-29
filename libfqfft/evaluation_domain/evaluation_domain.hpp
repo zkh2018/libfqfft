@@ -30,6 +30,54 @@
 
 namespace libfqfft {
 
+struct Info{
+    int radix;
+    int count;
+    int length;
+    int level;
+    int in_offset;
+    int out_offset;
+    int stride;
+    Info(){
+        radix = 0;
+        count = 0;
+        length = 0;
+        level = 0;
+        in_offset = 0;
+        out_offset = 0;
+        stride = 1;
+    }
+    Info(int _in_offset, int _out_offset, int _radix, int _length, int _stride, int _level){
+        in_offset = _in_offset;
+        out_offset = _out_offset;
+        radix = _radix;
+        length = _length;
+        level = _level;
+        stride = _stride;
+    }
+};
+
+struct fft_stage
+{
+    fft_stage(unsigned int _radix, unsigned int _length) : radix(_radix), length(_length) {}
+    unsigned int radix;
+    unsigned int length;
+};
+
+template<typename FieldT>
+struct fft_data
+{
+    unsigned int m;
+    bool smt;
+
+    std::vector<fft_stage> stages;
+
+    std::vector<std::vector<FieldT>> fTwiddles;
+    std::vector<std::vector<FieldT>> iTwiddles;
+
+    std::vector<FieldT> scratch;
+};
+
 /**
  * An evaluation domain.
  */
@@ -38,6 +86,7 @@ class evaluation_domain {
 public:
 
     const size_t m;
+    fft_data<FieldT> data;
 
     /**
      * Construct an evaluation domain S of size m, if possible.
@@ -60,6 +109,11 @@ public:
      * Compute the inverse FFT, over the domain S, of the vector a.
      */
     virtual void iFFT(std::vector<FieldT> &a) = 0;
+
+    /**
+     * Compute the inverse FFT, over the domain S, of the vector a.
+     */
+    virtual void fft_internal(std::vector<FieldT> &a, std::vector<std::vector<Info>>& infos) = 0;
 
     /**
      * Compute the FFT, over the domain g*S, of the vector a.

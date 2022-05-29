@@ -67,8 +67,14 @@ void arithmetic_sequence_domain<FieldT>::FFT(std::vector<FieldT> &a)
 }
 
 template<typename FieldT>
+void arithmetic_sequence_domain<FieldT>::fft_internal(std::vector<FieldT> &a, std::vector<std::vector<Info>>& infos)
+{
+}
+
+template<typename FieldT>
 void arithmetic_sequence_domain<FieldT>::iFFT(std::vector<FieldT> &a)
 {
+printf("call arithmetic_sequence_domain...\n");
   if (a.size() != this->m) throw DomainSizeException("arithmetic: expected a.size() == this->m");
   
   if (!this->precomputation_sentinel) do_precomputation();

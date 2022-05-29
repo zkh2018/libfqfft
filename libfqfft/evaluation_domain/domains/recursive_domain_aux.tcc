@@ -212,10 +212,12 @@ static void butterfly_4_parallel(std::vector<FieldT>& out, const std::vector<Fie
     }
 }
 
+
 template<typename FieldT, bool smt>
 void _recursive_FFT_inner(
     std::vector<FieldT>& in,
     std::vector<FieldT>& out,
+    std::vector<std::vector<Info>>& infos,
     const std::vector<std::vector<FieldT>>& twiddles,
     const std::vector<fft_stage>& stages,
     unsigned int in_offset,
@@ -252,16 +254,23 @@ void _recursive_FFT_inner(
 #endif
                 }
                 // std::cout << "Start thread on " << level << ": " << num_threads_in_recursion << std::endl;
-                _recursive_FFT_inner<FieldT, smt>(in, out, twiddles, stages, in_offset + i*stride, out_offset + i*stage_length, stride*radix, level+1, num_threads_in_recursion);
+                _recursive_FFT_inner<FieldT, smt>(in, out, infos, twiddles, stages, in_offset + i*stride, out_offset + i*stage_length, stride*radix, level+1, num_threads_in_recursion);
             }
         }
 
-        switch (radix)
-        {
-            case 2: butterfly_2_parallel(out, twiddles[level], stride, stage_length, out_offset, num_threads); break;
-            case 4: butterfly_4_parallel(out, twiddles[level], stride, stage_length, out_offset, num_threads); break;
-            default: std::cout << "error" << std::endl; assert(false);
+        Info info(in_offset, out_offset, radix, stage_length, stride, level);
+        if(level > infos.size()){
+            infos.resize(level+1);
         }
+        infos[level].push_back(info);
+        //infos.push_back(info);
+
+        //switch (radix)
+        //{
+        //    case 2: butterfly_2(out, twiddles[level], stride, stage_length, out_offset); break;
+        //    case 4: butterfly_4(out, twiddles[level], stride, stage_length, out_offset); break;
+        //    default: std::cout << "error" << std::endl; assert(false);
+        //}
     }
     else
     {
@@ -269,14 +278,14 @@ void _recursive_FFT_inner(
         {
             for (unsigned int i = 0; i < radix; i++)
             {
-                out[out_offset + i] = in[in_offset + i * stride];
+                //out[out_offset + i] = in[in_offset + i * stride];
             }
         }
         else
         {
             for (unsigned int i = 0; i < radix; i++)
             {
-                _recursive_FFT_inner<FieldT, smt>(in, out, twiddles, stages, in_offset + i*stride, out_offset + i*stage_length, stride*radix, level+1, num_threads);
+                _recursive_FFT_inner<FieldT, smt>(in, out, infos, twiddles, stages, in_offset + i*stride, out_offset + i*stage_length, stride*radix, level+1, num_threads);
             }
         }
 
@@ -291,19 +300,26 @@ void _recursive_FFT_inner(
         }
         else*/
         {
-            switch (radix)
-            {
-                case 2: butterfly_2(out, twiddles[level], stride, stage_length, out_offset); break;
-                case 4: butterfly_4(out, twiddles[level], stride, stage_length, out_offset); break;
-                default: std::cout << "error" << std::endl; assert(false);
+            Info info(in_offset, out_offset, radix, stage_length, stride, level);
+            if(level > infos.size()){
+                infos.resize(level+1);
             }
+            infos[level].push_back(info);
+            //infos.push_back(info);
+            //switch (radix)
+            //{
+            //    case 2: butterfly_2(out, twiddles[level], stride, stage_length, out_offset); break;
+            //    case 4: butterfly_4(out, twiddles[level], stride, stage_length, out_offset); break;
+            //    default: std::cout << "error" << std::endl; assert(false);
+            //}
         }
     }
 }
 
 template<typename FieldT>
-void _recursive_FFT(fft_data<FieldT>& data, std::vector<FieldT>& in, bool inverse)
+void _recursive_FFT(fft_data<FieldT>& data, std::vector<FieldT>& in, bool inverse, std::vector<std::vector<Info>>& infos, bool use_gpu)
 {
+    double t0 = omp_get_wtime();
 #ifdef MULTICORE
     size_t num_threads = omp_get_max_threads();
     if (data.smt)
@@ -313,16 +329,50 @@ void _recursive_FFT(fft_data<FieldT>& data, std::vector<FieldT>& in, bool invers
 #else
     size_t num_threads = 1;
 #endif
+    num_threads = 1;
+    //std::vector<std::vector<Info>> infos;//(data.scratch.size());
     if (data.smt)
     {
-        _recursive_FFT_inner<FieldT, true>(in, data.scratch, inverse? data.iTwiddles : data.fTwiddles, data.stages, 0, 0, 1, 0, num_threads);
+        _recursive_FFT_inner<FieldT, true>(in, data.scratch, infos, inverse? data.iTwiddles : data.fTwiddles, data.stages, 0, 0, 1, 0, num_threads);
     }
     else
     {
-        _recursive_FFT_inner<FieldT, false>(in, data.scratch, inverse? data.iTwiddles : data.fTwiddles, data.stages, 0, 0, 1, 0, num_threads);
+        _recursive_FFT_inner<FieldT, false>(in, data.scratch, infos, inverse? data.iTwiddles : data.fTwiddles, data.stages, 0, 0, 1, 0, num_threads);
     }
-    assert(in.size() == data.scratch.size());
-    std::swap(in, data.scratch);
+    double t1 = omp_get_wtime();
+    int n = 0;
+    for(int i = 0; i < infos.size(); i++){
+        n += infos[i].size();
+    }
+
+    if(!use_gpu){
+        for(int i = infos.size()-1; i >= 0; i--){
+#pragma omp parallel for
+            for(int j = 0; j < infos[i].size(); j++){ 
+                int in_offset = infos[i][j].in_offset;
+                int out_offset = infos[i][j].out_offset;
+                int level = i;//infos[i][j].level;
+                int length = infos[i][j].length;
+                int radix = infos[i][j].radix;
+                int stride = infos[i][j].stride;
+                if(length == 1){
+                    for(int k = 0; k <  radix; k++){
+                        data.scratch[out_offset + k] = in[in_offset + k * stride]; 
+                    }
+                }
+                switch (infos[i][j].radix)
+                {
+                    case 2: butterfly_2(data.scratch, inverse ? data.iTwiddles[level] : data.fTwiddles[level], 0, length, out_offset); break;
+                    case 4: butterfly_4(data.scratch, inverse ? data.iTwiddles[level] : data.fTwiddles[level], 0, length, out_offset); break;
+                    default: std::cout << "error" << std::endl; assert(false);
+                }
+            }
+        }
+        assert(in.size() == data.scratch.size());
+        std::swap(in, data.scratch);
+    }
+    //double t2 = omp_get_wtime();
+    //printf("preprocess time %f, calc time %f\n", t1-t0, t2-t1);
 }
 
 template<typename FieldT>
@@ -343,6 +393,11 @@ void _multiply_by_coset_and_constant(unsigned int m, std::vector<FieldT> &a, con
             u *= g;
         }
     }
+    //for (size_t j = 1; j < m; ++j){
+    //    FieldT u = c * (g^j);
+    //    a[j] *= u;
+    //    //u *= g;
+    //}
 }
 
 } // libfqfft

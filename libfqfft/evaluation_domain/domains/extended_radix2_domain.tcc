@@ -66,8 +66,14 @@ void extended_radix2_domain<FieldT>::FFT(std::vector<FieldT> &a)
 }
 
 template<typename FieldT>
+void extended_radix2_domain<FieldT>::fft_internal(std::vector<FieldT> &a, std::vector<std::vector<Info>>& infos)
+{
+}
+
+template<typename FieldT>
 void extended_radix2_domain<FieldT>::iFFT(std::vector<FieldT> &a)
 {
+printf("call extended_radix2_domain..\n");
     if (a.size() != this->m) throw DomainSizeException("extended_radix2: expected a.size() == this->m");
 
     // note: this is not in-place

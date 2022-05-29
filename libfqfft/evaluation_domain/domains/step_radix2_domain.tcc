@@ -76,8 +76,14 @@ void step_radix2_domain<FieldT>::FFT(std::vector<FieldT> &a)
 }
 
 template<typename FieldT>
+void step_radix2_domain<FieldT>::fft_internal(std::vector<FieldT> &a, std::vector<std::vector<Info>>& infos)
+{
+}
+
+template<typename FieldT>
 void step_radix2_domain<FieldT>::iFFT(std::vector<FieldT> &a)
 {
+    printf("call step_radix2_domain..\n");
     if (a.size() != this->m) throw DomainSizeException("step_radix2: expected a.size() == this->m");
 
     std::vector<FieldT> U0(a.begin(), a.begin() + big_m);
