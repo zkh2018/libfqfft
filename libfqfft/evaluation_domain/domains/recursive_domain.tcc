@@ -116,10 +116,10 @@ void recursive_domain<FieldT>::fft_internal(std::vector<FieldT> &a, std::vector<
 template<typename FieldT>
 void recursive_domain<FieldT>::iFFT(std::vector<FieldT> &a)
 {
-    double t0 = omp_get_wtime();
+    //double t0 = omp_get_wtime();
     std::vector<std::vector<Info>> infos;
     iFFT_internal(a, infos);
-    double t1 = omp_get_wtime();
+    //double t1 = omp_get_wtime();
 
     const FieldT sconst = FieldT(this->m).inverse();
 #ifdef MULTICORE
@@ -130,8 +130,8 @@ void recursive_domain<FieldT>::iFFT(std::vector<FieldT> &a)
         a[i] *= sconst;
         //a[i].gpu_mul(sconst);
     }
-    double t2 = omp_get_wtime();
-    printf("internal time = %f, elementwise mul time = %f\n", t1-t0, t2-t1); 
+    //double t2 = omp_get_wtime();
+    //printf("internal time = %f, elementwise mul time = %f\n", t1-t0, t2-t1); 
 }
 
 template<typename FieldT>
