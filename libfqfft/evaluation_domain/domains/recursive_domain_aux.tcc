@@ -393,9 +393,27 @@ void _multiply_by_coset_and_constant(unsigned int m, std::vector<FieldT> &a, con
             u *= g;
         }
     }
+
+    auto f = [](const FieldT& a){
+        for(int i = 0; i < 4; i++){
+            printf("%lu ", a.mont_repr.data[i]);
+        }
+        printf("\n");
+    };
     //for (size_t j = 1; j < m; ++j){
+    //    FieldT tmp = g^j;
     //    FieldT u = c * (g^j);
+    //    if(j == 256){
+    //        f(g);
+    //        printf("j = %d\n", j);
+    //       f(tmp);
+    //       f(u);
+    //       f(a[j]);
+    //    }
     //    a[j] *= u;
+    //    if(j == 256){
+    //        f(a[j]);
+    //    }
     //    //u *= g;
     //}
 }
