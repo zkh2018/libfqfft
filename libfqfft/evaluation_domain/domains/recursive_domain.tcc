@@ -143,6 +143,7 @@ void recursive_domain<FieldT>::iFFT_internal(std::vector<FieldT> &a, std::vector
 template<typename FieldT>
 void recursive_domain<FieldT>::cosetFFT(std::vector<FieldT> &a, const FieldT &g)
 {
+    printf("cosetFFT m=%d\n", this->m);
     _multiply_by_coset_and_constant(this->m, a, g);
     //FFT(a);
 }
