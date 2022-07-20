@@ -102,8 +102,12 @@ recursive_domain<FieldT>::recursive_domain(const size_t m, const libsnark::Confi
 template<typename FieldT>
 void recursive_domain<FieldT>::FFT(std::vector<FieldT> &a)
 {
+    #ifdef USE_GPU
     std::vector<std::vector<Info>> infos;
     _recursive_FFT(this->data, a, false, infos);
+    #else
+    _recursive_FFT(this->data, a, false);
+    #endif
 }
 
 template<typename FieldT>
@@ -116,10 +120,8 @@ void recursive_domain<FieldT>::fft_internal(std::vector<FieldT> &a, std::vector<
 template<typename FieldT>
 void recursive_domain<FieldT>::iFFT(std::vector<FieldT> &a)
 {
-    //double t0 = omp_get_wtime();
     std::vector<std::vector<Info>> infos;
     iFFT_internal(a, infos);
-    //double t1 = omp_get_wtime();
 
     const FieldT sconst = FieldT(this->m).inverse();
 #ifdef MULTICORE
@@ -128,31 +130,35 @@ void recursive_domain<FieldT>::iFFT(std::vector<FieldT> &a)
     for (size_t i = 0; i < this->m; ++i)
     {
         a[i] *= sconst;
-        //a[i].gpu_mul(sconst);
     }
-    //double t2 = omp_get_wtime();
-    //printf("internal time = %f, elementwise mul time = %f\n", t1-t0, t2-t1); 
 }
 
 template<typename FieldT>
 void recursive_domain<FieldT>::iFFT_internal(std::vector<FieldT> &a, std::vector<std::vector<Info>>& infos, bool use_gpu)
 {
+    #ifdef USE_GPU 
     _recursive_FFT(this->data, a, true, infos, use_gpu);
+    #else
+    _recursive_FFT(this->data, a, true);
+    #endif
 }
 
 template<typename FieldT>
 void recursive_domain<FieldT>::cosetFFT(std::vector<FieldT> &a, const FieldT &g)
 {
-    printf("cosetFFT m=%d\n", this->m);
     _multiply_by_coset_and_constant(this->m, a, g);
-    //FFT(a);
+    #ifndef USE_GPU
+    FFT(a);
+    #endif
 }
 
 template<typename FieldT>
 void recursive_domain<FieldT>::icosetFFT(std::vector<FieldT> &a, const FieldT &g)
 {
-    //std::vector<std::vector<Info>> infos;
-    //iFFT_internal(a, infos);
+    #ifndef USE_GPU
+    std::vector<std::vector<Info>> infos;
+    iFFT_internal(a, infos);
+    #endif
     const FieldT sconst = FieldT(this->m).inverse();
     _multiply_by_coset_and_constant(this->m, a, g.inverse(), sconst);
 }

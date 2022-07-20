@@ -213,6 +213,7 @@ static void butterfly_4_parallel(std::vector<FieldT>& out, const std::vector<Fie
 }
 
 
+#ifdef USE_GPU
 template<typename FieldT, bool smt>
 void _recursive_FFT_inner(
     std::vector<FieldT>& in,
@@ -375,6 +376,121 @@ void _recursive_FFT(fft_data<FieldT>& data, std::vector<FieldT>& in, bool invers
     //printf("preprocess time %f, calc time %f\n", t1-t0, t2-t1);
 }
 
+#else
+template<typename FieldT, bool smt>
+void _recursive_FFT_inner(
+    std::vector<FieldT>& in,
+    std::vector<FieldT>& out,
+    const std::vector<std::vector<FieldT>>& twiddles,
+    const std::vector<fft_stage>& stages,
+    unsigned int in_offset,
+    unsigned int out_offset,
+    unsigned int stride,
+    unsigned int level,
+    unsigned int num_threads)
+{
+    const unsigned int radix = stages[level].radix;
+    const unsigned int stage_length = stages[level].length;
+
+    if (num_threads > 1)
+    {
+        if (stage_length == 1)
+        {
+            for (unsigned int i = 0; i < radix; i++)
+            {
+                out[out_offset + i] = in[in_offset + i * stride];
+            }
+        }
+        else
+        {
+#ifdef MULTICORE
+            unsigned int num_threads_recursive = (num_threads >= radix) ? radix : num_threads;
+            #pragma omp parallel for num_threads(num_threads_recursive)
+#endif
+            for (unsigned int i = 0; i < radix; i++)
+            {
+                unsigned int num_threads_in_recursion = (num_threads < radix) ? 1 : (num_threads + i) / radix;
+                if (smt)
+                {
+#ifdef MULTICORE
+                    omp_set_num_threads(num_threads_in_recursion * 2);
+#endif
+                }
+                // std::cout << "Start thread on " << level << ": " << num_threads_in_recursion << std::endl;
+                _recursive_FFT_inner<FieldT, smt>(in, out, twiddles, stages, in_offset + i*stride, out_offset + i*stage_length, stride*radix, level+1, num_threads_in_recursion);
+            }
+        }
+
+        switch (radix)
+        {
+            case 2: butterfly_2_parallel(out, twiddles[level], stride, stage_length, out_offset, num_threads); break;
+            case 4: butterfly_4_parallel(out, twiddles[level], stride, stage_length, out_offset, num_threads); break;
+            default: std::cout << "error" << std::endl; assert(false);
+        }
+    }
+    else
+    {
+        if (stage_length == 1)
+        {
+            for (unsigned int i = 0; i < radix; i++)
+            {
+                out[out_offset + i] = in[in_offset + i * stride];
+            }
+        }
+        else
+        {
+            for (unsigned int i = 0; i < radix; i++)
+            {
+                _recursive_FFT_inner<FieldT, smt>(in, out, twiddles, stages, in_offset + i*stride, out_offset + i*stage_length, stride*radix, level+1, num_threads);
+            }
+        }
+
+        /*if (smt)
+        {
+            switch (radix)
+            {
+                case 2: butterfly_2_parallel(out, twiddles[level], stride, stage_length, out_offset, 2); break;
+                case 4: butterfly_4_parallel(out, twiddles[level], stride, stage_length, out_offset, 2); break;
+                default: std::cout << "error" << std::endl; assert(false);
+            }
+        }
+        else*/
+        {
+            switch (radix)
+            {
+                case 2: butterfly_2(out, twiddles[level], stride, stage_length, out_offset); break;
+                case 4: butterfly_4(out, twiddles[level], stride, stage_length, out_offset); break;
+                default: std::cout << "error" << std::endl; assert(false);
+            }
+        }
+    }
+}
+
+template<typename FieldT>
+void _recursive_FFT(fft_data<FieldT>& data, std::vector<FieldT>& in, bool inverse)
+{
+#ifdef MULTICORE
+    size_t num_threads = omp_get_max_threads();
+    if (data.smt)
+    {
+        num_threads /= 2;
+    }
+#else
+    size_t num_threads = 1;
+#endif
+    if (data.smt)
+    {
+        _recursive_FFT_inner<FieldT, true>(in, data.scratch, inverse? data.iTwiddles : data.fTwiddles, data.stages, 0, 0, 1, 0, num_threads);
+    }
+    else
+    {
+        _recursive_FFT_inner<FieldT, false>(in, data.scratch, inverse? data.iTwiddles : data.fTwiddles, data.stages, 0, 0, 1, 0, num_threads);
+    }
+    assert(in.size() == data.scratch.size());
+    std::swap(in, data.scratch);
+}
+#endif
+
 template<typename FieldT>
 void _multiply_by_coset_and_constant(unsigned int m, std::vector<FieldT> &a, const FieldT &g, const FieldT &c)
 {
@@ -394,28 +510,6 @@ void _multiply_by_coset_and_constant(unsigned int m, std::vector<FieldT> &a, con
         }
     }
 
-    auto f = [](const FieldT& a){
-        for(int i = 0; i < 4; i++){
-            printf("%lu ", a.mont_repr.data[i]);
-        }
-        printf("\n");
-    };
-    //for (size_t j = 1; j < m; ++j){
-    //    FieldT tmp = g^j;
-    //    FieldT u = c * (g^j);
-    //    if(j == 256){
-    //        f(g);
-    //        printf("j = %d\n", j);
-    //       f(tmp);
-    //       f(u);
-    //       f(a[j]);
-    //    }
-    //    a[j] *= u;
-    //    if(j == 256){
-    //        f(a[j]);
-    //    }
-    //    //u *= g;
-    //}
 }
 
 } // libfqfft
